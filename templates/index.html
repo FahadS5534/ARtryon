@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AR Ring Try-On</title>
+    <title>AR Ring Try-On (Image)</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -22,10 +22,8 @@
         input[type="file"] {
             margin-bottom: 20px;
         }
-        img {
+        canvas {
             border: 2px solid #000;
-            width: 640px;
-            height: 480px;
         }
     </style>
 </head>
@@ -35,7 +33,7 @@
         <input type="file" id="imageFile" name="file" accept="image/jpeg, image/png" required>
         <button type="submit">Upload Image</button>
     </form>
-    <img id="processedImage" alt="Processed Image with Ring Overlay" style="display: none;" />
+    <canvas id="processedCanvas"></canvas>
     <script>
         document.getElementById('uploadForm').onsubmit = async function(e) {
             e.preventDefault();
@@ -53,10 +51,20 @@
                 }
 
                 let blob = await response.blob();
-                let imageUrl = URL.createObjectURL(blob);
-                let imgElement = document.getElementById('processedImage');
-                imgElement.src = imageUrl;
-                imgElement.style.display = 'block';
+                let imgElement = new Image();
+                let canvas = document.getElementById('processedCanvas');
+                let ctx = canvas.getContext('2d');
+
+                imgElement.onload = function () {
+                    // Set canvas size to match the image size to avoid stretching
+                    canvas.width = imgElement.width;
+                    canvas.height = imgElement.height;
+
+                    // Draw the image on the canvas, maintaining the aspect ratio
+                    ctx.drawImage(imgElement, 0, 0, imgElement.width, imgElement.height);
+                };
+
+                imgElement.src = URL.createObjectURL(blob);
 
             } catch (error) {
                 console.error('Error uploading image:', error);

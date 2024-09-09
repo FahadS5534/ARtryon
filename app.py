@@ -4,7 +4,6 @@ from flask import Flask, request, send_file, render_template, jsonify
 import numpy as np
 from PIL import Image
 import io
-import os
 
 app = Flask(__name__)
 
@@ -15,17 +14,22 @@ mp_draw = mp.solutions.drawing_utils
 
 # Load ring image
 ring_image = Image.open('ring.png').convert("RGBA")
-ring_image_size = (50, 50)
 
-def overlay_ring_on_image(frame, ring_image, ring_image_size):
+def overlay_ring_on_image(frame, ring_image):
     try:
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         results = hands.process(frame_rgb)
 
         if results.multi_hand_landmarks:
             for hand_landmarks in results.multi_hand_landmarks:
+                # Get ring finger landmark (PIP joint)
                 ring_finger_dip = hand_landmarks.landmark[mp_hands.HandLandmark.RING_FINGER_PIP]
                 h, w, _ = frame.shape
+
+                # Keep the ring size the same as before
+                ring_image_size = (120, 120)  # Previous size of the ring (80x80 pixels)
+
+                # Calculate position for the ring
                 x = int(ring_finger_dip.x * w) - ring_image_size[0] // 2
                 y = int(ring_finger_dip.y * h) - ring_image_size[1] // 2
 
@@ -33,13 +37,15 @@ def overlay_ring_on_image(frame, ring_image, ring_image_size):
                 x = max(0, min(x, w - ring_image_size[0]))
                 y = max(0, min(y, h - ring_image_size[1]))
 
+                # Resize ring image
                 ring_resized = ring_image.resize(ring_image_size)
                 ring_array = np.array(ring_resized)
 
-                ring_alpha = ring_array[:, :, 3] / 255.0
-                background_alpha = 1.0 - ring_alpha
+                # Blend the ring with the hand image
+                ring_alpha = ring_array[:, :, 3] / 255.0  # Alpha channel of the ring
+                background_alpha = 1.0 - ring_alpha  # Background transparency
 
-                for c in range(0, 3):
+                for c in range(0, 3):  # Loop over RGB channels
                     frame[y:y + ring_image_size[1], x:x + ring_image_size[0], c] = (
                         ring_alpha * ring_array[:, :, c] +
                         background_alpha * frame[y:y + ring_image_size[1], x:x + ring_image_size[0], c]
@@ -67,7 +73,7 @@ def upload_image():
         frame = cv2.imread(input_image_path)
 
         # Process the image to overlay the ring
-        processed_image = overlay_ring_on_image(frame, ring_image, ring_image_size)
+        processed_image = overlay_ring_on_image(frame, ring_image)
 
         if processed_image is not None:
             # Convert processed image back to PIL format for sending
