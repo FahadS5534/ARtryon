@@ -19,68 +19,49 @@
         h1 {
             margin-bottom: 20px;
         }
+        input[type="file"] {
+            margin-bottom: 20px;
+        }
         img {
             border: 2px solid #000;
             width: 640px;
             height: 480px;
         }
-        #error-message {
-            color: red;
-            margin-top: 20px;
-        }
     </style>
 </head>
 <body>
-    <h1>AR Ring Try-On</h1>
-    <video id="video" width="640" height="480" autoplay></video>
-<img id="processedImage" alt="Processed Image"/>
+    <h1>AR Ring Try-On (Image)</h1>
+    <form id="uploadForm" enctype="multipart/form-data">
+        <input type="file" id="imageFile" name="file" accept="image/jpeg, image/png" required>
+        <button type="submit">Upload Image</button>
+    </form>
+    <img id="processedImage" alt="Processed Image with Ring Overlay" style="display: none;" />
+    <script>
+        document.getElementById('uploadForm').onsubmit = async function(e) {
+            e.preventDefault();
+            let formData = new FormData();
+            formData.append('file', document.getElementById('imageFile').files[0]);
 
-<script>
-    async function initCamera() {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-            document.getElementById('video').srcObject = stream;
+            try {
+                let response = await fetch('/upload_image', {
+                    method: 'POST',
+                    body: formData
+                });
 
-            // Capture a frame from the video every 2 seconds and send it to the server
-            setInterval(captureFrame, 2000);
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
 
-        } catch (err) {
-            console.error("Error accessing the camera: ", err);
-        }
-    }
+                let blob = await response.blob();
+                let imageUrl = URL.createObjectURL(blob);
+                let imgElement = document.getElementById('processedImage');
+                imgElement.src = imageUrl;
+                imgElement.style.display = 'block';
 
-    function captureFrame() {
-        const video = document.getElementById('video');
-        const canvas = document.createElement('canvas');
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
-
-        const dataUrl = canvas.toDataURL('image/jpeg');
-        const base64Image = dataUrl.replace(/^data:image\/(png|jpeg);base64,/, '');
-
-        sendImageToServer(base64Image);
-    }
-
-    async function sendImageToServer(image) {
-        const response = await fetch('/process_image', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ image: image })
-        });
-
-        const result = await response.json();
-        if (result.status === 'success') {
-            document.getElementById('processedImage').src = 'data:image/jpeg;base64,' + result.processed_image;
-        } else {
-            console.error("Error processing image: ", result.message);
-        }
-    }
-
-    window.onload = initCamera;
-</script>
-
+            } catch (error) {
+                console.error('Error uploading image:', error);
+            }
+        };
+    </script>
 </body>
 </html>
