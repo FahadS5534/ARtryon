@@ -1,6 +1,6 @@
 opencv-python==4.10.0.84  # Replace with the most suitable version
 mediapipe==0.10.0        # If you're using MediaPipe for hand tracking
-numpy==1.21.6            # Often required for OpenCV and image processing
+numpy==2.1.1            # Often required for OpenCV and image processing
 flask==2.3.2             # If using Flask for your web server handling
 gunicorn==20.1.0         # If you’re using Flask, this can help run it in production
 firebase-admin==6.1.0    # Firebase for accessing Firestore and authentication
