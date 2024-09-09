@@ -1,9 +1,0 @@
-{
-    "version": 2,
-    "builds": [
-      { "src": "ar_ring.py", "use": "@vercel/python" }
-    ],
-    "routes": [
-      { "src": "/(.*)", "dest": "/ar_ring.py" }
-    ]
-  }
