@@ -1,0 +1,58 @@
+<!-- templates/index.html -->
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AR Ring Try-On</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background-color: #f0f0f0;
+        }
+        h1 {
+            margin-bottom: 20px;
+        }
+        img {
+            border: 2px solid #000;
+            width: 640px;
+            height: 480px;
+        }
+    </style>
+</head>
+<body>
+    <h1>AR Ring Try-On</h1>
+    <img id="videoFeed" src="/video_feed" alt="Video Feed"/>
+    <script type="module">
+        // Import the functions you need from the SDKs you need
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-analytics.js";
+        // TODO: Add SDKs for Firebase products that you want to use
+        // https://firebase.google.com/docs/web/setup#available-libraries
+      
+        // Your web app's Firebase configuration
+        // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+        const firebaseConfig = {
+          apiKey: "AIzaSyAHtFDDG1hUEB2gGExz3PQqyhCGlhFnuOw",
+          authDomain: "krishna-jewelry-app.firebaseapp.com",
+          databaseURL: "https://krishna-jewelry-app-default-rtdb.firebaseio.com",
+          projectId: "krishna-jewelry-app",
+          storageBucket: "krishna-jewelry-app.appspot.com",
+          messagingSenderId: "815449214948",
+          appId: "1:815449214948:web:572c567d60c3dd7b1541f1",
+          measurementId: "G-C9WEWQL1VE"
+        };
+      
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const analytics = getAnalytics(app);
+      </script>
+</body>
+</html>
