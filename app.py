@@ -1,8 +1,10 @@
 import cv2
 import mediapipe as mp
-from flask import Flask, Response,render_template
+from flask import Flask, request, jsonify, render_template
 import numpy as np
 from PIL import Image
+import base64
+import io
 
 app = Flask(__name__)
 
@@ -11,100 +13,86 @@ mp_hands = mp.solutions.hands
 hands = mp_hands.Hands(max_num_hands=1, min_detection_confidence=0.7)
 mp_draw = mp.solutions.drawing_utils
 
-# Capture the camera feed
-cap = cv2.VideoCapture(0)
+# Load ring image
 ring_image = Image.open('ring.png').convert("RGBA")
 ring_image_size = (50, 50)
 
+# Function to process uploaded image and overlay the ring on the hand
+def process_image(image_data):
+    try:
+        # Convert the image data to a PIL image
+        image = Image.open(io.BytesIO(base64.b64decode(image_data)))
+        frame = np.array(image)
 
-# Function to process the video frame and overlay the ring on the hand
-def capture_video():
-    while True:
-        try:
-            ret, frame = cap.read()
-            if not ret:
-           
-                continue
+        # Convert the frame to RGB (OpenCV uses BGR by default)
+        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-            # Flip the frame horizontally
-            frame = cv2.flip(frame, 1)  # 1 for horizontal flip
+        # Process the frame to detect hands
+        results = hands.process(frame_rgb)
 
-            # Convert the frame to RGB (OpenCV uses BGR by default)
-            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        # If hands are detected
+        if results.multi_hand_landmarks:
+            for hand_landmarks in results.multi_hand_landmarks:
+                # Get the coordinates of the ring finger DIP joint
+                ring_finger_dip = hand_landmarks.landmark[mp_hands.HandLandmark.RING_FINGER_PIP]
+                h, w, _ = frame.shape
+                x = int(ring_finger_dip.x * w) - ring_image_size[0] // 2  # Centering the ring
+                y = int(ring_finger_dip.y * h) - ring_image_size[1] // 2
 
-            # Process the frame to detect hands
-            results = hands.process(frame_rgb)
+                # Resize the ring image
+                ring_resized = ring_image.resize(ring_image_size)
 
-            # If hands are detected
-            if results.multi_hand_landmarks:
-                for hand_landmarks in results.multi_hand_landmarks:
-                    # Get the coordinates of the ring finger DIP joint
-                    ring_finger_dip = hand_landmarks.landmark[mp_hands.HandLandmark.RING_FINGER_PIP]
-                    h, w, _ = frame.shape
-                    x = int(ring_finger_dip.x * w) - ring_image_size[0] // 2  # Centering the ring
-                    y = int(ring_finger_dip.y * h) - ring_image_size[1] // 2
+                # Convert the resized ring image to a NumPy array
+                ring_array = np.array(ring_resized)
 
-                    # Resize the ring image
-                    ring_resized = ring_image.resize(ring_image_size)
+                # Define the region of interest (ROI) on the frame
+                roi_height = min(ring_array.shape[0], h - y)
+                roi_width = min(ring_array.shape[1], w - x)
 
-                    # Convert the resized ring image to a NumPy array
-                    ring_array = np.array(ring_resized)
+                # Ensure ROI dimensions are valid
+                if roi_height <= 0 or roi_width <= 0:
+                    continue
 
-                    # Define the region of interest (ROI) on the frame
-                    roi_height = min(ring_array.shape[0], h - y)  # Ensure the ROI doesn't exceed the frame
-                    roi_width = min(ring_array.shape[1], w - x)
+                # Extract the alpha channel (transparency) from the ring image
+                ring_alpha = ring_array[:, :, 3] / 255.0
+                background_alpha = 1.0 - ring_alpha
 
-                    # Ensure ROI dimensions are valid
-                    if roi_height <= 0 or roi_width <= 0:
-                        continue  # Skip if ROI is invalid
+                # Blend the ring image with the frame
+                for c in range(0, 3):
+                    frame[y:y + roi_height, x:x + roi_width, c] = (
+                        ring_alpha * ring_array[:, :, c] +
+                        background_alpha * frame[y:y + roi_height, x:x + roi_width, c]
+                    )
 
-                    # Adjust the ring image size to fit the ROI if necessary
-                    ring_array = ring_array[:roi_height, :roi_width]
+        # Convert the frame back to PIL image for encoding
+        result_image = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+        buffered = io.BytesIO()
+        result_image.save(buffered, format="JPEG")
+        result_image_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
 
-                    # Extract the alpha channel (transparency) from the ring image
-                    ring_alpha = ring_array[:, :, 3] / 255.0
-                    background_alpha = 1.0 - ring_alpha
+        return result_image_base64
 
-                    # Ensure the dimensions match for blending
-                    if ring_array.shape[0] == roi_height and ring_array.shape[1] == roi_width:
-                        # Perform the blending of the ring image with the ROI
-                        for c in range(0, 3):
-                            frame[y:y + roi_height, x:x + roi_width, c] = (
-                                ring_alpha * ring_array[:, :, c] +
-                                background_alpha * frame[y:y + roi_height, x:x + roi_width, c]
-                            )
+    except Exception as e:
+        print(f"Error processing image: {e}")
+        return None
 
-            # Encode the frame in JPEG format for display in HTML
-            _, buffer = cv2.imencode('.jpg', frame)
-            frame = buffer.tobytes()
-            
-            # Return the frame as part of a multipart HTTP response
-            yield (b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+# Route to process the image uploaded from the client-side camera
+@app.route('/process_image', methods=['POST'])
+def process_image_route():
+    data = request.get_json()
+    image_data = data['image']
 
-        except Exception as e:
-            print(f"Error processing frame: {e}")
-            continue  # Continue with the next frame
+    # Process the image
+    processed_image = process_image(image_data)
+
+    if processed_image:
+        return jsonify({'status': 'success', 'processed_image': processed_image})
+    else:
+        return jsonify({'status': 'error', 'message': 'Failed to process image'})
 
 @app.route('/')
 def index():
     return render_template('index.html')
 
-# Route to stream the video feed
-@app.route('/video_feed')
-def video_feed():
-    return Response(capture_video(),
-                    mimetype='multipart/x-mixed-replace; boundary=frame')
-
 if __name__ == '__main__':
-    try:
-        # Check if the camera is opened successfully
-        if not cap.isOpened():
-            print("Error: Camera not accessible")
-        else:
-            # Run the Flask app
-            app.run(debug=True,host='0.0.0.0',port=5000)
-    except Exception as e:
-        print(f"An error occurred: {e}")
-    finally:
-        cap.release()
+    app.run(debug=True, host='0.0.0.0', port=5000)
