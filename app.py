@@ -23,7 +23,7 @@ def capture_video():
         try:
             ret, frame = cap.read()
             if not ret:
-                print("Error: Failed to capture frame")
+           
                 continue
 
             # Flip the frame horizontally
@@ -103,7 +103,7 @@ if __name__ == '__main__':
             print("Error: Camera not accessible")
         else:
             # Run the Flask app
-            app.run(debug=True)
+            app.run(debug=True,host='0.0.0.0',port=5000)
     except Exception as e:
         print(f"An error occurred: {e}")
     finally:
